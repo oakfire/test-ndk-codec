@@ -97,8 +97,14 @@ int64_t systemnanotime() {
 int FindStartCode(const uint8_t *Buf) {
     if(Buf[0]!=0 || Buf[1]!=0 || Buf[2] !=0 || Buf[3] !=1)
         return 0;//0x00000001?
-    else
-        return 1;
+    else {
+        unsigned char naltype = (unsigned char)Buf[4] & 0x1F;
+        if (naltype != 6 && naltype != 7 && naltype != 8) {
+            return 1;
+        } else {
+            return 2;
+        }
+    }
 }
 
 int GetOneNALU(const uint8_t *buf, int bufsize, int *end)
@@ -106,13 +112,25 @@ int GetOneNALU(const uint8_t *buf, int bufsize, int *end)
     int pos = 0;
     int StartCodeFound = 0;
     int info = 0;
-
+    bool found_frame = false;
     info = FindStartCode (buf);
-    if(info != 1) {
+    if(info == 0) {
         return -1;
     }
-
-    while (!StartCodeFound){
+    found_frame = (info == 1);
+    if (!found_frame) {
+        while (StartCodeFound != 1){
+            pos++;
+            if (pos > bufsize){
+                *end = 1;
+                return bufsize;
+            }
+            StartCodeFound = FindStartCode(buf + pos);
+        }
+        found_frame = true;
+    }
+    StartCodeFound = 0;
+    while (StartCodeFound == 0){
         pos++;
         if (pos > bufsize){
             *end = 1;
